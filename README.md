@@ -38,7 +38,7 @@
 ```sh
 go install github.com/egoist/mygo/cmd/mygo@latest
 go tool mygo dev
-go tool my vet
+go tool mygo vet
 ```
 
 生成 macOS 应用：
