@@ -221,26 +221,8 @@ func (a *app) paneView(c *ui.Context, index int) {
 					date = ""
 				}
 				ui.Text(c, date).Width(modifiedWidth).PaddingX(4).TextColor(theme.TextMuted).SingleLine()
-			})
-		}).OnClick(func() { a.active = index; a.focus = index + 1 }).ContextMenu(func(m *ui.Menu) {
-			for _, kind := range []string{"Copy", "Move", "Rename", "New folder", "Move to Trash", "Delete"} {
-				if m.Item(kind).Disabled(a.busy).Chosen() {
-					a.active = index
-					a.ask(kind)
-				}
-			}
-			m.Separator()
-			if m.Item("Reveal in Finder").Chosen() {
-				a.active = index
-				paths := a.targets()
-				if len(paths) > 0 {
-					a.launch("open", "-R", paths[0])
-				}
-			}
-			if m.Item("Open Terminal Here").Chosen() {
-				a.launch("open", "-a", "Terminal", t.path)
-			}
-		}).OnChange(func() { a.active = index }).OnSubmit(func() { a.active = index; a.open() }).OnShortcut(0, ui.KeyBackspace, func() { a.active = index; a.load(t, filepath.Dir(t.path)) }).OnShortcut(0, ui.KeySpace, func() {
+			}).ContextMenu(func(m *ui.Menu) { a.fileMenu(c, m, index, r.Index) })
+		}).OnClick(func() { a.active = index; a.focus = index + 1 }).OnChange(func() { a.active = index }).OnSubmit(func() { a.active = index; a.open() }).OnShortcut(0, ui.KeyBackspace, func() { a.active = index; a.load(t, filepath.Dir(t.path)) }).OnShortcut(0, ui.KeySpace, func() {
 			a.active = index
 			targets := a.targets()
 			if len(targets) > 0 {
@@ -273,6 +255,38 @@ func (a *app) paneView(c *ui.Context, index int) {
 			}
 		})
 	})
+}
+
+// fileMenu fills a file row's context menu. The row that owns the menu is the
+// one that was clicked, so the cursor moves to it and every item acts on that
+// entry rather than on the row the cursor happened to be on. Marked entries
+// still win, as targets returns them in place of the cursor's.
+func (a *app) fileMenu(c *ui.Context, m *ui.Menu, index, row int) {
+	a.active, a.focus = index, index+1
+	t := a.panes[index].tabs[a.panes[index].current]
+	if row >= 0 && row < len(t.visible()) {
+		t.cursor = row
+	}
+	none := len(a.targets()) == 0 // the parent row, which has nothing to act on
+	for _, kind := range []string{"Copy", "Move", "Rename", "New folder", "Move to Trash", "Delete"} {
+		if m.Item(kind).Disabled(a.busy || none).Chosen() {
+			a.ask(kind)
+		}
+	}
+	m.Separator()
+	if m.Item("Reveal in Finder").Disabled(none).Chosen() {
+		if paths := a.targets(); len(paths) > 0 {
+			a.launch("open", "-R", paths[0])
+		}
+	}
+	if m.Item("Copy Path").Disabled(a.busy || none).Chosen() {
+		if paths := a.targets(); len(paths) > 0 {
+			c.Services().WriteClipboard(joinedPaths(paths))
+		}
+	}
+	if m.Item("Open Terminal Here").Chosen() {
+		a.launch("open", "-a", "Terminal", t.path)
+	}
 }
 func (a *app) markMove(t *tab, es []entry, delta int) {
 	if t.cursor >= 0 && t.cursor < len(es) && es[t.cursor].name != ".." {
