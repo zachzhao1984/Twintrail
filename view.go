@@ -264,8 +264,19 @@ func (a *app) paneView(c *ui.Context, index int) {
 func (a *app) fileMenu(c *ui.Context, m *ui.Menu, index, row int) {
 	a.active, a.focus = index, index+1
 	t := a.panes[index].tabs[a.panes[index].current]
-	if row >= 0 && row < len(t.visible()) {
+	moved := false
+	if row >= 0 && row < len(t.visible()) && row != t.cursor {
 		t.cursor = row
+		moved = true
+	}
+	// The frame the menu opens in is the one the row moved in, but the
+	// runtime shows the native menu once the frame is already presented,
+	// and it stays up until an item is chosen, so nothing the row moved to
+	// reaches the screen while the menu is there. Asking for a frame now
+	// has it drawn again before the menu shows, as a menu of Finder's does
+	// when it chooses the row it was opened on.
+	if moved {
+		c.Invalidate()
 	}
 	none := len(a.targets()) == 0 // the parent row, which has nothing to act on
 	for _, kind := range []string{"Copy", "Move", "Rename", "New folder", "Move to Trash", "Delete"} {

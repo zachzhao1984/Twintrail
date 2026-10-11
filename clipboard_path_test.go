@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"image"
 	"os"
 	"path/filepath"
 	"testing"
@@ -215,5 +217,78 @@ func TestContextMenuParentRow(t *testing.T) {
 	}
 	if err := tt.ChooseMenuItem("Open Terminal Here"); err != nil {
 		t.Fatalf("Open Terminal Here on the parent row: %v", err)
+	}
+}
+
+// rowBackground returns the background colour the file list draws for the row
+// showing name, at the centre of its row box.
+func rowBackground(t *testing.T, img *image.RGBA, tt *ui.Tester, name string) string {
+	t.Helper()
+	r, ok := tt.Find(name)
+	if !ok {
+		t.Fatalf("no row shows %q", name)
+	}
+	i := img.PixOffset(int(r.X+r.W/2), int(r.Y+r.H/2))
+	return fmt.Sprintf("%02x%02x%02x", img.Pix[i], img.Pix[i+1], img.Pix[i+2])
+}
+
+// TestContextMenuMovesHighlight checks the row the context menu opened on is
+// drawn as the chosen row while the menu is up.
+//
+// The runtime shows the native menu once the frame it opened in is already
+// presented, and the menu stays up until an item is chosen. A highlight drawn
+// only in that frame is therefore never seen, so the list must be drawn again
+// after the cursor moved. The headless host has no native menu and presents
+// every frame it settles, so what this asserts is the redraw the fix asks for.
+func TestContextMenuMovesHighlight(t *testing.T) {
+	a := fixture(t)
+	accent := martaTheme(false).Accent
+	want := fmt.Sprintf("%02x%02x%02x", accent.R, accent.G, accent.B)
+	presented := 0
+	tt := ui.NewTester(func(c *ui.Context) {
+		a.view(c)
+		presented++
+	}, 1100, 720)
+	a.current().cursor = 1 // Folder
+	tt.Frame()
+	if got := rowBackground(t, tt.Image(), tt, "hello.txt"); got == want {
+		t.Fatalf("hello.txt already shows as chosen before any right-click: %s", got)
+	}
+	presented = 0
+	if err := tt.RightClick("hello.txt"); err != nil {
+		t.Fatal(err)
+	}
+	// Right-clicking a row the cursor is not on must ask for a frame after
+	// the cursor moved: two frames open the menu, and the third presents the
+	// highlight the menu would otherwise cover. Without the redraw only two
+	// frames run and the row stays unhighlighted until the menu closes.
+	if presented < 3 {
+		t.Fatalf("the list was drawn %d time(s) for a right-click on another row, want a frame drawn again after the cursor moved", presented)
+	}
+	if got := rowBackground(t, tt.Image(), tt, "hello.txt"); got != want {
+		t.Fatalf("hello.txt drawn %s with the menu up, want the chosen colour %s", got, want)
+	}
+	if got := rowBackground(t, tt.Image(), tt, "Folder"); got == want {
+		t.Fatalf("Folder is still drawn as chosen: %s", got)
+	}
+}
+
+// TestContextMenuAlreadyFocusedRow checks right-clicking the row the cursor is
+// already on asks for no extra frame: nothing moved, so nothing to redraw.
+func TestContextMenuAlreadyFocusedRow(t *testing.T) {
+	a := fixture(t)
+	presented := 0
+	tt := ui.NewTester(func(c *ui.Context) {
+		a.view(c)
+		presented++
+	}, 1100, 720)
+	a.current().cursor = 2 // hello.txt
+	tt.Frame()
+	presented = 0
+	if err := tt.RightClick("hello.txt"); err != nil {
+		t.Fatal(err)
+	}
+	if presented > 2 {
+		t.Fatalf("the list was drawn %d time(s) for a right-click on the cursor's own row, want none beyond the menu's", presented)
 	}
 }
