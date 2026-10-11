@@ -1,0 +1,66 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+# The build only reads the repository and uploads its own artifacts, so it
+# needs no token scope beyond reading the checkout.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build the universal disk image
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          # mygo.json has no toolchain field, so go.mod's directive is what
+          # pins the Go the build runs on.
+          go-version-file: go.mod
+
+      # Skipped on workflow_dispatch, which has no tag to check.
+      - name: Check that the tag matches the version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          version="$(jq -r .version mygo.json)"
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match mygo.json, which says version $version."
+            echo "::error::To release $GITHUB_REF_NAME, commit a mygo.json with version ${GITHUB_REF_NAME#v} and tag that commit."
+            exit 1
+          fi
+
+      # mygo downloads libghostty-vt from a GitHub release asset on a cold
+      # cache, and that redirect can fail with a transient EOF. Retry the
+      # build a few times, but stop at the third failure and surface the
+      # last error, so a real build failure is never masked.
+      - name: Build the disk image
+        run: |
+          for attempt in 1 2 3; do
+            echo "::group::Build attempt $attempt of 3"
+            if go tool mygo build --platform darwin/universal --skip-notarize; then
+              echo "::endgroup::"
+              exit 0
+            fi
+            echo "::endgroup::"
+            echo "::warning::Build attempt $attempt of 3 failed"
+            if [ "$attempt" -lt 3 ]; then
+              sleep 15
+            fi
+          done
+          echo "::error::mygo build failed after 3 attempts; see the log above for the last error"
+          exit 1
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Twintrail-universal
+          # out in mygo.json is build, and mygo writes the platform to
+          # <out>/<goos>-<goarch>, which for this target is
+          # build/darwin-universal, holding one disk image named
+          # "Twintrail <version>.dmg" with no arch suffix.
+          path: build/*/*.dmg
+          if-no-files-found: error
