@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2
+
+- No change to the app itself. This release re-runs the release build with
+  a fix to the workflow that produced the 0.1.1 disk image, which was
+  discarded before it could be attached to the release.
+
 ## 0.1.1
 
 - In-app updates. Twintrail now checks for a new version in the background
