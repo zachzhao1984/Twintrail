@@ -2,10 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 	"image/png"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -103,6 +105,38 @@ func TestFontSettingsRoundTrip(t *testing.T) {
 	m := a.applicationMenu()
 	if it := m.ItemByID("preferences"); it == nil || it.Accelerator != "Cmd+," {
 		t.Fatal("Preference menu missing")
+	}
+}
+
+// The real updater.MenuItem reads the user's language, which asks the app's
+// event loop, and a test has none. The stub keeps the app's menu shape the
+// same while giving the test a build that returns.
+func init() {
+	updateMenuItem = func() *mygo.MenuItem {
+		return &mygo.MenuItem{Label: "Check for Updates…", Click: func(*mygo.MenuItem, *mygo.Window) {}}
+	}
+}
+
+// TestAppMenuCarriesUpdateItem checks that the app menu carries the
+// updater's "Check for Updates…" item, which the plugin's docs place right
+// after About.
+//
+// The item is built through the updateMenuItem seam, not updater.MenuItem
+// itself, because building the real one reads the user's language, which
+// blocks on an app event loop a test does not run.
+func TestAppMenuCarriesUpdateItem(t *testing.T) {
+	a := fixture(t)
+	m := a.applicationMenu()
+	found := false
+	for _, top := range m.Items() {
+		for _, it := range top.Submenu {
+			if strings.Contains(it.Label, "Check for Updates") {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Fatal("the app menu has no Check for Updates item")
 	}
 }
 

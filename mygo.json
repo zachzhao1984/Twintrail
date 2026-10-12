@@ -1,6 +1,10 @@
 {
   "name": "Twintrail",
   "identifier": "com.example.twintrail",
-  "version": "0.1.0",
-  "out": "build"
+  "version": "0.1.1",
+  "out": "build",
+  "updates": {
+    "publicKey": "gB7U6lBrptFONtTdxfkJhiqgv918vk2wi1RnczyDpXI=",
+    "github": "zachzhao1984/Twintrail"
+  }
 }

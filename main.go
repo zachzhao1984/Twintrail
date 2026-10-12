@@ -2,12 +2,17 @@ package main
 
 import (
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/plugins/updater/native"
 	"github.com/egoist/mygo/ui"
 	"log"
 	"os"
 )
 
 func main() {
+	// native draws the update window in the same native UI as the rest of
+	// the app, so the app needs no webview. Use one of the two updater
+	// plugins only.
+	mygo.Use(native.Plugin)
 	home, _ := os.UserHomeDir()
 	a := newApp(home, home)
 	a.restore()

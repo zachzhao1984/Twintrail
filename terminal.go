@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/plugins/terminal"
+	"github.com/egoist/mygo/plugins/updater"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -173,6 +174,13 @@ func (a *app) terminalView(c *ui.Context) {
 		}
 	})
 }
+
+// updateMenuItem builds the updater's "Check for Updates…" item. Building it
+// reads the user's language, which asks the app's event loop, so it is only
+// safe once the loop runs: the app builds its menu from WhenReady. A test
+// has no loop, and overrides this with an item that does not read one.
+var updateMenuItem = updater.MenuItem
+
 func (a *app) applicationMenu() *mygo.Menu {
 	a.terminalMenu = &mygo.MenuItem{ID: "toggle-terminal", Label: "Toggle Terminal", Type: mygo.MenuItemCheckbox, Accelerator: "Cmd+`", Click: func(item *mygo.MenuItem, w *mygo.Window) {
 		a.toggleTerminal()
@@ -180,7 +188,7 @@ func (a *app) applicationMenu() *mygo.Menu {
 			w.Invalidate()
 		}
 	}}
-	return mygo.NewMenu([]*mygo.MenuItem{{Role: mygo.RoleAppMenu, Submenu: []*mygo.MenuItem{{Role: mygo.RoleAbout}, mygo.Separator(), a.preferenceMenu(), mygo.Separator(), {Role: mygo.RoleServices}, mygo.Separator(), {Role: mygo.RoleHide}, {Role: mygo.RoleHideOthers}, {Role: mygo.RoleUnhide}, mygo.Separator(), {Role: mygo.RoleQuit}}}, {Role: mygo.RoleFileMenu}, {Role: mygo.RoleEditMenu}, {Label: "View", Submenu: []*mygo.MenuItem{a.terminalMenu, mygo.Separator(), {Role: mygo.RoleToggleFullScreen}}}, {Role: mygo.RoleWindowMenu}})
+	return mygo.NewMenu([]*mygo.MenuItem{{Role: mygo.RoleAppMenu, Submenu: []*mygo.MenuItem{{Role: mygo.RoleAbout}, updateMenuItem(), mygo.Separator(), a.preferenceMenu(), mygo.Separator(), {Role: mygo.RoleServices}, mygo.Separator(), {Role: mygo.RoleHide}, {Role: mygo.RoleHideOthers}, {Role: mygo.RoleUnhide}, mygo.Separator(), {Role: mygo.RoleQuit}}}, {Role: mygo.RoleFileMenu}, {Role: mygo.RoleEditMenu}, {Label: "View", Submenu: []*mygo.MenuItem{a.terminalMenu, mygo.Separator(), {Role: mygo.RoleToggleFullScreen}}}, {Role: mygo.RoleWindowMenu}})
 }
 func (a *app) refreshTerminalMenu() {
 	if a.terminalMenu != nil && a.terminalMenu.IsChecked() != a.current().terminal.visible {

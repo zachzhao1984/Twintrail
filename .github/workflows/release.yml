@@ -5,10 +5,10 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
-# The build only reads the repository and uploads its own artifacts, so it
-# needs no token scope beyond reading the checkout.
+# The build reads the repository and uploads artifacts to a draft release,
+# so it needs contents: write for that upload alone.
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -38,22 +38,46 @@ jobs:
       # cache, and that redirect can fail with a transient EOF. Retry the
       # build a few times, but stop at the third failure and surface the
       # last error, so a real build failure is never masked.
+      #
+      # MYGO_UPDATER_PRIVATE_KEY is the repository secret holding the
+      # signing key, base64 as mygo-update.key holds it. Without it mygo
+      # still builds the disk image and skips the update files, so a
+      # repository that has not set the secret yet releases normally,
+      # just without the update a shipped app would offer.
       - name: Build the disk image
+        env:
+          MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          if [ -z "${MYGO_UPDATER_PRIVATE_KEY:-}" ]; then
+            echo "::warning::MYGO_UPDATER_PRIVATE_KEY is not set: building without the signed update files."
+          fi
           for attempt in 1 2 3; do
             echo "::group::Build attempt $attempt of 3"
             if go tool mygo build --platform darwin/universal --skip-notarize; then
               echo "::endgroup::"
-              exit 0
+              break
             fi
             echo "::endgroup::"
             echo "::warning::Build attempt $attempt of 3 failed"
             if [ "$attempt" -lt 3 ]; then
               sleep 15
             fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::mygo build failed after 3 attempts; see the log above for the last error"
+              exit 1
+            fi
           done
-          echo "::error::mygo build failed after 3 attempts; see the log above for the last error"
-          exit 1
+
+      # Without the signing key there are no update files, so there is
+      # nothing for -upload to send and the step would fail on "nothing to
+      # upload". Skip it rather than break a release that has no updates.
+      - name: Upload the update files to the draft release
+        if: env.MYGO_UPDATER_PRIVATE_KEY != ''
+        env:
+          MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: go tool mygo build --platform darwin/universal --skip-notarize --skip-dmg -upload
 
       - uses: actions/upload-artifact@v7
         with:
