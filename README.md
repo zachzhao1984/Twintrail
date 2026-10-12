@@ -1,5 +1,9 @@
 # Twintrail
 
+<p align="center">
+  <img src="resources/icon.png" width="256" alt="Twintrail">
+</p>
+
 ![Twintrail](docs/twintrail.png)
 
 A macOS native dual-pane file manager built on Go and myGO v0.4.2. Fully native UI, no WebView. Follows Marta's dual-pane navigation and shortcut habits, and performs real file operations.
